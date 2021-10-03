@@ -148,11 +148,13 @@
 					if(data.formats[i].audioCodec == null){
 						continue;
 					}
-					html += `
+					if(data.formats[i].hasAudio==true & data.formats[i].hasVideo==true){
+						html += `
 						<option value="${data.formats[i].itag}|${data.formats[i].container}">
 							${data.formats[i].container} - ${data.formats[i].qualityLabel}
 						</option>
-					`;
+					`;}
+					
 					detailsNodes.thumbnail.src = data.videoDetails.thumbnails[data.videoDetails.thumbnails.length - 1].url; // get HD thumbnail img
 					detailsNodes.title.innerText = data.videoDetails.title;
 					detailsNodes.description.innerText = data.videoDetails.description;
