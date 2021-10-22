@@ -23,6 +23,9 @@ app.get("/videoInfo",async function(request,response){
 
 app.get("/download",function(request,response){
 	const videoURL = request.query.videoURL;
+	const startTime = request.query.startTime;
+	const duration = request.query.duration;
+	//console.log("startTime: " +startTime+ "\n duration" +duration);
 	const itag = request.query.itag;
 	const format = request.query.format;
 	response.header("Content-Disposition",'attachment;\ filename="video.'+format+'"');
@@ -33,14 +36,15 @@ app.get("/download",function(request,response){
 	// cut given youtube video and move to 'video_out.mp4' file
 	// ytdl() returns readstream of youtube video 
 	// then send to ffmpeg() to cut video into video_out.mp4
+	console.log('Starting conversion...')
 	ffmpeg(ytdl(videoURL,{
 		filter: format => format.itag == itag
 	}))
-		.setStartTime('00:00:10') //start time of video (change to user input later)
-		.setDuration('10') //duration of video (change to user input later)
+		.setStartTime(startTime) //start time of video (change to user input later)
+		.setDuration(duration) //duration of video (change to user input later)
 		.output('video_out.mp4')
 		.on('end', function(err) {
-			if(!err) { console.log('conversion Done') }
+			if(!err) { console.log('Conversion done') }
 			//take 'video_out.mp4' file and convert back into readstream
 			var stream = fs.createReadStream('video_out.mp4');
 			//pipe readstream
@@ -48,7 +52,7 @@ app.get("/download",function(request,response){
 		})
 		.on('error', function(err){
 			console.log('error: ', err)
-		}).run()
+		}).run()	
 
 	//tried to get ffmpeg to output to a readStream
 	//errors with invalid arg

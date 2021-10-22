@@ -97,6 +97,14 @@
             <label for="videoURL">Enter URL</label>
             <input type="text" id="videoURL">
         </div>
+		<div class = "form-element">
+			<label for="startTime">Enter start time as hour:minute:seconds</label>
+			<input type="text" id="startTime">
+		</div>
+		<div class = "form-element">
+			<label for="duration">Enter duration as seconds</label>
+			<input type="text" id="duration">
+		</div>
         <div class="form-element">
             <button id="get-video-info-btn">Download</button>
         </div>
@@ -175,10 +183,12 @@
 
 		document.querySelector("#download-btn").addEventListener("click",function(){
 			let videoURL = document.querySelector("#video-url").value;
+			let startTime = document.querySelector("#startTime").value;
+			let duration = document.querySelector("#duration").value;
 			let details = document.querySelector("#download-options").value.split("|");
 			let itag = details[0];
 			let format = details[1];
-			window.open(host + "download?videoURL="+videoURL+"&itag="+itag+"&format="+format);
+			window.open(host + "download?videoURL="+videoURL+"&itag="+itag+"&format="+format+"&startTime="+startTime+"&duration="+duration);
 		});
     </script>
 </body>
