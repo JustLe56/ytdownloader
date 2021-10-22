@@ -49,6 +49,11 @@ app.get("/download",function(request,response){
 			var stream = fs.createReadStream('video_out.mp4');
 			//pipe readstream
 			stream.pipe(response);
+			//clean up file
+			fs.unlink('video_out.mp4', (err) =>{
+				if(err)throw err;
+				console.log("file deleted")
+			})
 		})
 		.on('error', function(err){
 			console.log('error: ', err)
