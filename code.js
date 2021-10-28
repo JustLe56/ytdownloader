@@ -1,8 +1,11 @@
 const express = require("express");
 const ytdl = require("ytdl-core");
 const fs = require('fs');
+const { Readable } = require('stream');
+var admZip = require("adm-zip");
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
-const ffmpeg = require('fluent-ffmpeg')
+const ffmpeg = require('fluent-ffmpeg');
+const AdmZip = require("adm-zip");
 ffmpeg.setFfmpegPath(ffmpegPath)
 
 const app = express();
@@ -18,67 +21,78 @@ app.get("/",function(request,response){
 app.get("/videoInfo",async function(request,response){
 	const videoURL = request.query.videoURL;
 	const info = await ytdl.getInfo(videoURL);
+
 	response.status(200).json(info);
 });
 
-app.get("/download",function(request,response){
+app.get("/download",async function(request,response){
 	const videoURL = request.query.videoURL;
-	const startTime = request.query.startTime;
-	const duration = request.query.duration;
-	//console.log("startTime: " +startTime+ "\n duration" +duration);
 	const itag = request.query.itag;
 	const format = request.query.format;
+	var zip = new AdmZip();
+	const info = await ytdl.getInfo(videoURL);
+
 	response.header("Content-Disposition",'attachment;\ filename="video.'+format+'"');
-	
-	//due to mp4 weirdness this is the current solution read more at: https://github.com/fluent-ffmpeg/node-fluent-ffmpeg/issues/932
-	// only readstreams can pipe to response but ffmpeg can't output a readStream
+	console.log(info.videoDetails.chapters.length-1)
+	const numChapters = info.videoDetails.chapters.length-1
+	var i = 0
+	var conversionCount = 0;
+	console.log("All chapters: ")
+	for (i = 0; i <= numChapters; i++){
+		var currTitle = info.videoDetails.chapters[i].title;
+		var currStartTime = info.videoDetails.chapters[i].start_time; //given in seconds aka 125 = 00:02:05
+		if (i === numChapters){
+			var nextStartTime = info.videoDetails.lengthSeconds;
+		}
+		else{
+			var nextStartTime = info.videoDetails.chapters[i+1].start_time;
+		}
+		
+		var duration = nextStartTime-currStartTime;
+		var startTimeConv = new Date(currStartTime * 1000).toISOString().substr(11, 8);
 
-	// cut given youtube video and move to 'video_out.mp4' file
-	// ytdl() returns readstream of youtube video 
-	// then send to ffmpeg() to cut video into video_out.mp4
-	console.log('Starting conversion...')
-	ffmpeg(ytdl(videoURL,{
-		filter: format => format.itag == itag
-	}))
-		.setStartTime(startTime) //start time of video (change to user input later)
-		.setDuration(duration) //duration of video (change to user input later)
-		.output('video_out.mp4')
-		.on('end', function(err) {
-			if(!err) { console.log('Conversion done') }
-			//take 'video_out.mp4' file and convert back into readstream
-			var stream = fs.createReadStream('video_out.mp4');
-			//pipe readstream
-			stream.pipe(response);
-			//clean up file
-			fs.unlink('video_out.mp4', (err) =>{
-				if(err)throw err;
-				console.log("file deleted")
+		console.log("Starting conversion for "+currTitle+" at: "+startTimeConv);
+		ffmpeg(ytdl(videoURL,{
+			filter: format => format.itag == itag
+		}))
+			.setStartTime(startTimeConv) //start time of video (hh:mm:ss format)
+			.setDuration(duration) //duration of video (seconds format)
+			.output('video_'+i+'.mp4')
+			.on('end', function(err) {
+				if(!err) { 
+					console.log('Conversion finished'); //TODO: figure out better way of signalling to compress than checking every time
+					
+					//console.log(conversionCount+"vs "+numChapters);
+					if (conversionCount === numChapters){
+						for (var j = 0; j <= numChapters; j++){
+							zip.addLocalFile("video_"+j+".mp4"); //TODO: change naming convention to use original chapter title
+						}
+						var zipFileContents = zip.toBuffer();
+						
+						//clean up local files
+						for (var j = 0; j <= numChapters; j++){
+							fs.unlink("video_"+j+".mp4", (err) =>{
+								if(err)throw err;
+								console.log("file deleted")
+							})
+						}
+
+						const fileName = 'uploads.zip';
+   						const fileType = 'application/zip';
+						response.writeHead(200, {
+							'Content-Disposition': `attachment; filename="${fileName}"`,
+							'Content-Type': fileType,
+						  })
+						return response.end(zipFileContents)
+					}
+					conversionCount+=1;
+				}
+				
 			})
-		})
-		.on('error', function(err){
-			console.log('error: ', err)
-		}).run()	
-
-	//tried to get ffmpeg to output to a readStream
-	//errors with invalid arg
-
-	// let inReadStream = ytdl(videoURL,{filter: format => format.itag == itag})
-	// let outReadStream = ytdl(videoURL,{filter: format => format.itag == itag})
-	// ffmpeg(inReadStream)
-	// 	.setStartTime('00:00:10') //start time of video
-	// 	.setDuration('10') //duration of video
-	// 	.output(outReadStream)
-	// 	.on('end', function(err) {
-	// 		if(!err) { console.log('conversion Done') }
-	// 		//pipe readstream
-	// 		outReadStream.pipe(response);
-	// 	})
-	// 	.on('error', function(err){
-	// 		console.log('error: ', err)
-	// 	}).run()
-
-	
-
+			.on('error', function(err){
+				console.log('error: ', err)
+			}).run()
+	}
 
 });
 
@@ -86,3 +100,16 @@ const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`server started at ${port}`);
 });
+
+
+async function compress(){
+	console.log("upload pls")
+	for(i = 0; i <= numChapters; i++){
+		zip.addLocalFile('video_'+i+'.mp4')
+	}
+	var zipFileContents = zip.toBuffer();
+	const stream = Readable.from(zipFileContents);
+	const fileName =  'videos.zip';
+	const fileType = 'application/zip';
+	return stream;
+}
