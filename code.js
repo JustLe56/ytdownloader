@@ -34,9 +34,10 @@ app.get("/download",async function(request,response){
 
 	response.header("Content-Disposition",'attachment;\ filename="video.'+format+'"');
 	console.log(info.videoDetails.chapters.length-1)
-	const numChapters = info.videoDetails.chapters.length-1
-	var i = 0
+	const numChapters = info.videoDetails.chapters.length-1;
+	var i = 0;
 	var conversionCount = 0;
+	var downloadStream = ytdl(videoURL,{filter: format => format.itag == itag})
 	console.log("All chapters: ")
 	for (i = 0; i <= numChapters; i++){
 		var currTitle = info.videoDetails.chapters[i].title;
@@ -49,18 +50,16 @@ app.get("/download",async function(request,response){
 		}
 		
 		var duration = nextStartTime-currStartTime;
-		var startTimeConv = new Date(currStartTime * 1000).toISOString().substr(11, 8);
+		var startTimeConv = new Date((currStartTime) * 1000).toISOString().substr(11, 8);
 
-		console.log("Starting conversion for "+currTitle+" at: "+startTimeConv);
-		ffmpeg(ytdl(videoURL,{
-			filter: format => format.itag == itag
-		}))
+		console.log("Starting conversion for "+currTitle+" at: "+startTimeConv+ "to " +duration);
+		ffmpeg(downloadStream)
 			.setStartTime(startTimeConv) //start time of video (hh:mm:ss format)
 			.setDuration(duration) //duration of video (seconds format)
 			.output('video_'+i+'.mp4')
 			.on('end', function(err) {
 				if(!err) { 
-					console.log('Conversion finished'); //TODO: figure out better way of signalling to compress than checking every time
+					console.log('Conversion finished ' +conversionCount+ "vs "+numChapters); //TODO: figure out better way of signalling to compress than checking every time
 					
 					//console.log(conversionCount+"vs "+numChapters);
 					if (conversionCount === numChapters){
@@ -70,12 +69,12 @@ app.get("/download",async function(request,response){
 						var zipFileContents = zip.toBuffer();
 						
 						//clean up local files
-						for (var j = 0; j <= numChapters; j++){
-							fs.unlink("video_"+j+".mp4", (err) =>{
-								if(err)throw err;
-								console.log("file deleted")
-							})
-						}
+						// for (var j = 0; j <= numChapters; j++){
+						// 	fs.unlink("video_"+j+".mp4", (err) =>{
+						// 		if(err)throw err;
+						// 		console.log("file deleted")
+						// 	})
+						// }
 
 						const fileName = 'uploads.zip';
    						const fileType = 'application/zip';
@@ -100,16 +99,3 @@ const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`server started at ${port}`);
 });
-
-
-async function compress(){
-	console.log("upload pls")
-	for(i = 0; i <= numChapters; i++){
-		zip.addLocalFile('video_'+i+'.mp4')
-	}
-	var zipFileContents = zip.toBuffer();
-	const stream = Readable.from(zipFileContents);
-	const fileName =  'videos.zip';
-	const fileType = 'application/zip';
-	return stream;
-}
