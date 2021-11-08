@@ -5,6 +5,8 @@ const { Readable } = require('stream');
 var admZip = require("adm-zip");
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path
 const ffmpeg = require('fluent-ffmpeg');
+const pathToFfmpeg = require('ffmpeg-static');
+const ffprobe = require('ffprobe-static');
 const AdmZip = require("adm-zip");
 ffmpeg.setFfmpegPath(ffmpegPath)
 
@@ -54,8 +56,12 @@ app.get("/download",async function(request,response){
 
 		console.log("Starting conversion for "+currTitle+" at: "+startTimeConv+ "to " +duration);
 		ffmpeg(downloadStream)
+			.setFfmpegPath(pathToFfmpeg)
+      		.setFfprobePath(ffprobe.path)
 			.setStartTime(startTimeConv) //start time of video (hh:mm:ss format)
 			.setDuration(duration) //duration of video (seconds format)
+			.withVideoCodec('copy')
+      		.withAudioCodec('copy')
 			.output('video_'+i+'.mp4')
 			.on('end', function(err) {
 				if(!err) { 
@@ -69,12 +75,12 @@ app.get("/download",async function(request,response){
 						var zipFileContents = zip.toBuffer();
 						
 						//clean up local files
-						// for (var j = 0; j <= numChapters; j++){
-						// 	fs.unlink("video_"+j+".mp4", (err) =>{
-						// 		if(err)throw err;
-						// 		console.log("file deleted")
-						// 	})
-						// }
+						for (var j = 0; j <= numChapters; j++){
+							fs.unlink("video_"+j+".mp4", (err) =>{
+								if(err)throw err;
+								console.log("file deleted")
+							})
+						}
 
 						const fileName = 'uploads.zip';
    						const fileType = 'application/zip';
